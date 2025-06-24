@@ -1,5 +1,6 @@
 use crate::context::Context;
 use crate::error::JobSchedulerError;
+use crate::job::job_data::JobStoredData;
 use crate::job::to_code::{JobCode, NotificationCode};
 use crate::job::{JobCreator, JobDeleter, JobLocked, JobRunner};
 use crate::notification::{NotificationCreator, NotificationDeleter, NotificationRunner};
@@ -8,7 +9,7 @@ use crate::simple::{
     SimpleJobCode, SimpleMetadataStore, SimpleNotificationCode, SimpleNotificationStore,
 };
 use crate::store::{MetaDataStorage, NotificationStore};
-use chrono::{DateTime, NaiveDateTime, Utc};
+use chrono::{DateTime, Utc};
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -364,16 +365,72 @@ impl JobsSchedulerLocked {
         }
         let mut r = self.context.metadata_storage.write().await;
         r.get(job_id).await.map(|v| {
-            if let Some(vv) = v {
+            if let Some(mut vv) = v {
                 if vv.next_tick == 0 {
                     return None;
                 }
-                match NaiveDateTime::from_timestamp_opt(vv.next_tick as i64, 0) {
+                vv.set_count(0);
+                let _ = r.add_or_update(vv.clone());
+                match DateTime::from_timestamp(vv.next_tick as i64, 0) {
                     None => None,
-                    Some(ts) => Some(DateTime::from_naive_utc_and_offset(ts, Utc)),
+                    Some(ts) => Some(DateTime::from_naive_utc_and_offset(ts.naive_utc(), Utc)),
                 }
             } else {
                 None
+            }
+        })
+    }
+
+    ///
+    /// Set job count job when running
+    pub async fn running(&mut self, job_id: Uuid) -> Result<(), JobSchedulerError> {
+        if !self.inited().await {
+            let mut s = self.clone();
+            s.init().await?;
+        }
+        let mut r = self.context.metadata_storage.write().await;
+        r.get(job_id).await.map(|v| {
+            if let Some(mut vv) = v {
+                vv.count = 1000;
+                vv.set_count(125);
+
+                // let mut vc = JobStoredData {
+                //     id: vv.id,
+                //     count: 1200,
+                //     last_updated: vv.last_updated,
+                //     last_tick: vv.last_tick,
+                //     next_tick: vv.next_tick,
+                //     time_offset_seconds: vv.time_offset_seconds,
+                //     job: vv.job,
+                //     job_type: vv.job_type,
+                //     extra: vv.extra,
+                //     ran: true,
+                //     stopped: vv.stopped,
+                // };
+                // println!("to update ------------------- {:?}", vc);
+                // let _ = vc.set_count(vv.count);
+            }
+        })
+    }
+
+    ///
+    /// Verify if job is still running
+    pub async fn skip_if_is_running(&mut self, job_id: Uuid) -> Result<bool, JobSchedulerError> {
+        if !self.inited().await {
+            let mut s = self.clone();
+            s.init().await?;
+        }
+        let mut r = self.context.metadata_storage.write().await;
+        r.get(job_id).await.map(|v| {
+            if let Some(vv) = v {
+                println!("------- fetching ------- {:?}", vv);
+                if vv.count > 0 {
+                    true
+                } else {
+                    false
+                }
+            } else {
+                false
             }
         })
     }

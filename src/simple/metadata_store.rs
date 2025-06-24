@@ -46,8 +46,11 @@ impl DataStore<JobStoredData> for SimpleMetadataStore {
     ) -> Pin<Box<dyn Future<Output = Result<(), JobSchedulerError>> + Send>> {
         let id: Uuid = data.id.as_ref().unwrap().into();
         let job_data = self.data.clone();
+
+        println!("-- updating ..... {:?}", data);
         Box::pin(async move {
             let mut w = job_data.write().await;
+
             w.insert(id, data);
             Ok(())
         })
@@ -111,6 +114,7 @@ impl MetaDataStorage for SimpleMetadataStore {
             let val = w.get_mut(&guid);
             match val {
                 Some(val) => {
+                    // val.set_count();
                     val.set_next_tick(next_tick);
                     val.set_last_tick(last_tick);
                     Ok(())

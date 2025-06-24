@@ -153,6 +153,10 @@ impl JobStoredData {
         })
     }
 
+    pub fn set_count(&mut self, count: u32) {
+        self.count = count
+    }
+
     pub fn set_next_tick(&mut self, tick: Option<DateTime<Utc>>) {
         self.next_tick = match tick {
             Some(t) => t.timestamp() as u64,
@@ -161,6 +165,7 @@ impl JobStoredData {
     }
 
     pub fn set_last_tick(&mut self, tick: Option<DateTime<Utc>>) {
+        println!("last_tick: {:?}", tick);
         self.last_tick = tick.map(|t| t.timestamp() as u64);
     }
 }

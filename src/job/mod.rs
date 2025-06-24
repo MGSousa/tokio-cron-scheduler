@@ -238,7 +238,7 @@ impl JobLocked {
                     .map(|t| t.timestamp() as u64)
                     .unwrap_or(0),
                 job_type: JobType::Cron.into(),
-                count: 0,
+                count: 12,
                 extra: vec![],
                 ran: false,
                 stopped: false,
